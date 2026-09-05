@@ -46,7 +46,7 @@ export function score(el, { rate, unit, band, deadAir, pauseCount, errorCount, l
  */
 export function transcript(el, { words, lineStarts, errors, fillers, lang, onSeek, onToggleFix }) {
   el.innerHTML = '';
-  const wordEls = [], lineEls = [];
+  const wordEls = [], lineEls = [], spanFor = [];
 
   const errStart = new Map(), errEnd = new Map();
   errors.forEach(e => { errStart.set(e.start, e); errEnd.set(e.end, e); });
@@ -76,6 +76,8 @@ export function transcript(el, { words, lineStarts, errors, fillers, lang, onSee
         openErr = document.createElement('span');
         openErr.className = 'err';
         openErr.dataset.rank = e.rank;
+        openErr.dataset.a = e.start;
+        openErr.dataset.b = e.end;
         openErr.tabIndex = 0;
         openErr.setAttribute('role', 'button');
         openErr.setAttribute('aria-label', `Mistake: ${e.said}. Activate for the correction.`);
@@ -97,6 +99,7 @@ export function transcript(el, { words, lineStarts, errors, fillers, lang, onSee
       w.textContent = words[i].word;
       host.appendChild(w);
       wordEls[i] = w;
+      if (host !== p && host.classList.contains('err')) spanFor[i] = host;
       if (i < end) host.appendChild(document.createTextNode(' '));
 
       if (errEnd.has(i) && openErr) {
@@ -109,6 +112,8 @@ export function transcript(el, { words, lineStarts, errors, fillers, lang, onSee
       }
       if (filEnd.has(i)) { host = p; p.appendChild(document.createTextNode(' ')); }
     }
+
+    if (openErr && !openErr.dataset.orig) openErr.dataset.orig = openErr.innerHTML;
 
     const card = document.createElement('div');
     card.className = 'fixcard';
@@ -128,7 +133,7 @@ export function transcript(el, { words, lineStarts, errors, fillers, lang, onSee
     if (sp && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); onToggleFix(sp); }
   });
 
-  return { wordEls, lineEls };
+  return { wordEls, lineEls, spanFor };
 }
 
 export function fixBody(e) {
@@ -210,12 +215,22 @@ export function waveform(canvas, { envelope, pauses, duration, currentTime }) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const W = r.width, H = r.height;
   if (!W) return;
-  canvas.width = Math.round(W * dpr);
-  canvas.height = Math.round(H * dpr);
+
+  // This runs on every animation frame while playing. Resizing a canvas
+  // reallocates and clears it, and getComputedStyle forces a style flush, so
+  // both are done only when something actually changed.
+  const stamp = `${W}x${H}x${dpr}`;
+  if (canvas.dataset.size !== stamp) {
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.dataset.size = stamp;
+  }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-  const on = css('--wave-on'), off = css('--wave-off'), pz = css('--wave-pause');
+  const cs = getComputedStyle(document.documentElement);
+  const on = cs.getPropertyValue('--wave-on').trim();
+  const off = cs.getPropertyValue('--wave-off').trim();
+  const pz = cs.getPropertyValue('--wave-pause').trim();
 
   ctx.clearRect(0, 0, W, H);
   const n = envelope.length, bw = W / n, gap = bw > 3 ? 1 : 0.5;

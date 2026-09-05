@@ -50,17 +50,6 @@ export function stalls(words, pauseList, limit = 5) {
     }));
 }
 
-/**
- * Do the long stalls land before content words or before function words?
- * Vocabulary retrieval and grammar assembly fail in different places, and
- * they need different practice, so the distinction is worth drawing.
- */
-export function stallShape(stallList, fillerIndices = new Set()) {
-  if (!stallList.length) return null;
-  const long = stallList.filter(s => s.seconds >= 1.5).length;
-  return { long, total: stallList.length };
-}
-
 /** Group words into readable lines, breaking on sentence ends and long gaps. */
 export function lines(words, maxWords = 18) {
   const out = [];

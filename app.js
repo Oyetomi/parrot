@@ -17,8 +17,15 @@ const au = $('#au');
 const state = {
   file: null, samples: null, duration: 0, envelope: [],
   words: [], lang: null, analysis: null,
-  wordEls: [], lineEls: [], follow: true, curWord: -1, lastLine: -1,
+  // Derived once in show(). These were being recomputed inside the animation
+  // frame loop, which meant re-deriving line breaks and pauses 60 times a second.
+  errors: [], lineStarts: [], pauseList: [],
+  wordEls: [], lineEls: [], spanFor: [],
+  follow: true, curWord: -1, curEl: null, lastLine: -1, running: false,
 };
+
+const SMOOTH = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+const scrollToEl = el => el?.scrollIntoView({ behavior: SMOOTH, block: 'center' });
 
 /* ------------------------------------------------------------- API key */
 
@@ -69,6 +76,9 @@ function pick(file) {
   $('.dropmain').textContent = file.name;
   $('.dropsub').textContent = `${(file.size / 1048576).toFixed(1)} MB · ready`;
   refreshStart();
+  // Nothing can happen without a key, so ask for it now rather than leaving
+  // the button greyed out with no explanation.
+  if (!Store.getKey()) { $('#keyInput').value = ''; dlg.showModal(); }
 }
 function refreshStart() {
   const ready = !!state.file && !!Store.getKey();
@@ -108,6 +118,9 @@ $('#btnCancel').addEventListener('click', () => location.reload());
 $('#btnAgain').addEventListener('click', () => location.reload());
 
 async function run() {
+  if (state.running) return;
+  state.running = true;
+  $('#btnStart').disabled = true;
   const apiKey = Store.getKey();
   $('#setup').hidden = true;
   $('#working').hidden = false;
@@ -157,12 +170,15 @@ async function run() {
     state.analysis = analysis;
     show({ analysis, pauseList, rate, air, stallList });
   } catch (e) {
-    fail(e instanceof G.ApiError || e instanceof A.UnsupportedFileError
-      ? e.message
-      : `Something broke: ${e.message}`);
     if (e instanceof A.UnsupportedFileError) {
-      fail(`${e.message} Convert it first and try again:\n\n\`ffmpeg -i "${state.file.name}" -vn -ac 1 -ar 16000 audio.wav\``);
+      fail(`${e.message}\n\nConvert it first, then try the result:\n\n\`ffmpeg -i "${state.file.name}" -vn -ac 1 -ar 16000 audio.wav\``);
+    } else if (e instanceof G.ApiError) {
+      fail(e.message);
+    } else {
+      fail(`Something broke: ${e.message}`);
     }
+  } finally {
+    state.running = false;
   }
 }
 
@@ -192,6 +208,15 @@ function show({ analysis, pauseList, rate, air, stallList }) {
   const fillers = cleanSpans(analysis.fillers, max);
   const level = { framework: 'CEFR', band: '—', reaching: '', ...(analysis.level || {}) };
 
+  // A line break landing inside an error span would split it across two
+  // paragraphs and orphan half of it. Drop those break points instead.
+  const lineStarts = M.lines(state.words)
+    .filter(s => !errors.some(e => s > e.start && s <= e.end));
+
+  state.errors = errors;
+  state.lineStarts = lineStarts;
+  state.pauseList = pauseList;
+
   $('#working').hidden = true;
   $('#report').hidden = false;
   $('#player').hidden = false;
@@ -212,27 +237,28 @@ function show({ analysis, pauseList, rate, air, stallList }) {
   const seek = t => { au.currentTime = Math.max(0, Math.min(state.duration - .05, t)); if (au.paused) au.play().catch(() => {}); tick(); };
 
   const built = R.transcript($('#transcript'), {
-    words: state.words, lineStarts: M.lines(state.words), errors, fillers,
+    words: state.words, lineStarts, errors, fillers,
     lang: state.lang, onSeek: seek,
     onToggleFix: sp => toggleFix(sp, errors),
   });
   state.wordEls = built.wordEls;
   state.lineEls = built.lineEls;
+  state.spanFor = built.spanFor;
 
   $('#paceLede').textContent = analysis.pace_note || '';
   R.pace($('#paceBox'), { rate, band: state.lang.band, unitLabel: state.lang.unitLabel, benchmarked: state.lang.benchmarked });
-  R.stalls($('#stalls'), stallList, t => { seek(t); $('#listen').scrollIntoView({ behavior: 'smooth' }); });
+  R.stalls($('#stalls'), stallList, t => { seek(t); $('#listen').scrollIntoView({ behavior: SMOOTH }); });
   $('#stallNote').textContent = analysis.stall_note || '';
 
   $('#fixLede').textContent = errors.length
     ? 'Ranked by how much each one costs you, not by how often it appears.'
-    : 'Nothing worth correcting in this recording.';
+    : '';
   paintFixes(errors, seek);
 
   R.verdict($('#verdict'), level, Array.isArray(analysis.verdict) ? analysis.verdict : [String(analysis.verdict || '')]);
   R.drills($('#drills'), Array.isArray(analysis.drills) ? analysis.drills : []);
 
-  sizeWave();
+  drawWave();
   tick();
   window.scrollTo({ top: 0 });
 }
@@ -240,7 +266,7 @@ function show({ analysis, pauseList, rate, air, stallList }) {
 /* --------------------------------------------------------- fix toggles */
 
 function toggleFix(sp, errors) {
-  const e = errors.find(x => String(x.rank) === sp.dataset.rank);
+  const e = (errors || state.errors).find(x => String(x.rank) === sp.dataset.rank);
   if (!e) return;
   const card = sp.closest('.tline').querySelector('.fixcard');
   const same = card.classList.contains('open') && card.dataset.rank === sp.dataset.rank;
@@ -253,7 +279,7 @@ function toggleFix(sp, errors) {
 }
 
 $('#btnAll').addEventListener('click', () => {
-  const errors = cleanSpans(state.analysis?.errors || [], state.words.length - 1);
+  const errors = state.errors;
   const anyClosed = [...document.querySelectorAll('.fixcard')].some(c => !c.classList.contains('open') && c.closest('.tline').querySelector('.err'));
   document.querySelectorAll('.tline').forEach(line => {
     const sp = line.querySelector('.err');
@@ -280,10 +306,24 @@ function setMode(fixed) {
     else sp.innerHTML = sp.dataset.orig;
   });
   document.querySelectorAll('.w[data-i]').forEach(el => { state.wordEls[+el.dataset.i] = el; });
+  // The element under the playhead just changed identity; re-resolve it.
+  state.curEl?.classList.remove('now');
+  state.curEl = null;
+  state.curWord = -1;
+  tick();
 }
 
 function paintFixes(errors, seek) {
   const list = $('#fixlist');
+  const f = $('#filters');
+  if (!errors.length) {
+    f.innerHTML = '';
+    list.innerHTML = `<li class="nofix">
+      <p><b>Nothing worth correcting.</b> The model found no grammar or word-choice
+      errors in this recording. That is a real result, not a failure — but remember
+      it says nothing about pronunciation, which a transcript cannot show.</p></li>`;
+    return;
+  }
   list.innerHTML = errors.map(e => `
     <li data-tag="${R.esc(e.category)}">
       <span class="rank">${String(e.rank).padStart(2, '0')}</span>
@@ -294,11 +334,10 @@ function paintFixes(errors, seek) {
     </li>`).join('');
   list.querySelectorAll('.hearit').forEach(b => b.addEventListener('click', () => {
     seek(parseFloat(b.dataset.t) - 0.35);
-    $('#listen').scrollIntoView({ behavior: 'smooth' });
+    $('#listen').scrollIntoView({ behavior: SMOOTH });
   }));
 
   const tags = ['all', ...new Set(errors.map(e => e.category))];
-  const f = $('#filters');
   f.innerHTML = '';
   tags.forEach((t, i) => {
     const b = document.createElement('button');
@@ -317,8 +356,11 @@ function paintFixes(errors, seek) {
 /* ------------------------------------------------------------ playback */
 
 const cvs = $('#wave');
-function sizeWave() {
-  R.waveform(cvs, { envelope: state.envelope, pauses: M.pauses(state.words), duration: state.duration, currentTime: au.currentTime });
+function drawWave() {
+  R.waveform(cvs, {
+    envelope: state.envelope, pauses: state.pauseList,
+    duration: state.duration, currentTime: au.currentTime,
+  });
 }
 let scrubbing = false;
 function seekFromX(x) {
@@ -371,24 +413,29 @@ function tick() {
     if (w.start > t) break;
   }
   if (idx !== state.curWord) {
-    if (state.curWord >= 0 && state.wordEls[state.curWord]) state.wordEls[state.curWord].classList.remove('now');
+    state.curEl?.classList.remove('now');
+    state.curEl = null;
     state.curWord = idx;
     if (idx >= 0) {
-      state.wordEls[idx]?.classList.add('now');
+      // In the corrected view the original word spans inside an error are gone,
+      // replaced by the correction, so highlight the whole span instead.
+      const corrected = document.body.classList.contains('corrected');
+      state.curEl = (corrected && state.spanFor[idx]) || state.wordEls[idx] || null;
+      state.curEl?.classList.add('now');
       $('#nowword').textContent = state.words[idx].word;
-      const starts = M.lines(state.words);
+      const starts = state.lineStarts;
       let li = 0;
       for (let k = 0; k < starts.length; k++) if (idx >= starts[k]) li = k;
       if (li !== state.lastLine) {
         state.lineEls.forEach((el, k) => el?.classList.toggle('on', k === li));
-        if (state.follow && !au.paused) state.lineEls[li]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (state.follow && !au.paused) scrollToEl(state.lineEls[li]);
         state.lastLine = li;
       }
     } else {
       $('#nowword').textContent = au.paused ? 'paused' : '…';
     }
   }
-  sizeWave();
+  drawWave();
   if (!au.paused) requestAnimationFrame(tick);
 }
 
@@ -414,6 +461,6 @@ addEventListener('keydown', e => {
   else if (e.key === 'ArrowRight') { e.preventDefault(); au.currentTime += 5; tick(); }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); au.currentTime -= 5; tick(); }
 });
-addEventListener('resize', () => { if (!$('#report').hidden) sizeWave(); });
+addEventListener('resize', () => { if (!$('#report').hidden) drawWave(); });
 
 paintKeyState();

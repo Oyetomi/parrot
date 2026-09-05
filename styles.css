@@ -1,4 +1,5 @@
 :root{
+  color-scheme:light;
   --paper:#F2F1EC; --card:#FFFFFF;
   --ink:#14161D; --ink2:#454851; --muted:#767982; --faint:#9B9EA6;
   --line:#E1DFD8; --line2:#CBC9C1;
@@ -14,6 +15,7 @@
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
+    color-scheme:dark;
     --paper:#0A0B0F; --card:#13151B;
     --ink:#EEEFF4; --ink2:#C3C6CE; --muted:#8B8E98; --faint:#63666F;
     --line:#23252D; --line2:#343740;
@@ -27,6 +29,7 @@
   }
 }
 :root[data-theme="dark"]{
+  color-scheme:dark;
   --paper:#0A0B0F; --card:#13151B;
   --ink:#EEEFF4; --ink2:#C3C6CE; --muted:#8B8E98; --faint:#63666F;
   --line:#23252D; --line2:#343740;
@@ -153,7 +156,8 @@ body.playing .playbtn .ic-pause{display:block}
 .steps .meta{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--faint);font-variant-numeric:tabular-nums}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .workerr{background:var(--corail-soft);border:1px solid var(--corail);color:var(--corail);
-  border-radius:var(--radius);padding:14px 16px;font-size:14.5px;margin:0 0 22px;max-width:70ch}
+  border-radius:var(--radius);padding:14px 16px;font-size:14.5px;margin:0 0 22px;max-width:70ch;
+  white-space:pre-wrap;overflow-x:auto}
 .workerr code{background:transparent;border-color:currentColor}
 
 /* ===== score ===== */
@@ -198,6 +202,7 @@ h2{font-size:clamp(24px,4.2vw,32px);line-height:1.08}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .chip[aria-pressed="true"]{color:#0A0B0F}}
 .chip .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
 .hint{font-size:13px;color:var(--faint);margin-left:auto}
+@media (hover:none){.hint{display:none}}
 @media(max-width:640px){.hint{margin-left:0;width:100%}}
 
 #transcript{display:flex;flex-direction:column;gap:3px}
@@ -280,6 +285,9 @@ body.corrected .err sup{display:none}
   border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
 .fixes > li{background:var(--card);padding:18px 20px;display:grid;grid-template-columns:36px 1fr;gap:0 16px;scroll-margin-top:24px}
 .fixes > li.hide{display:none}
+.fixes > li.nofix{display:block;padding:22px 24px}
+.fixes > li.nofix p{margin:0;color:var(--ink2);font-size:15px;max-width:62ch}
+.fixes > li.nofix b{color:var(--ink)}
 .rank{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:var(--faint);
   font-variant-numeric:tabular-nums;padding-top:5px}
 .fixes .fixnote,.fixes .gloss{grid-column:2}

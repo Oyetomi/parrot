@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Playback, usePlayback } from './Playback';
+import { Playback, usePlayback, SMOOTH } from './Playback';
 import { Player, MiniPlayer } from './Player';
 import { Transcript } from './Transcript';
 import { Pace, Stalls } from './Pace';
@@ -61,6 +61,23 @@ export function Report({ data, onAgain }: { data: ReportData; onAgain: () => voi
   }, []);
 
   const { lang, analysis } = data;
+
+  // Opening every fix at once is useless if the first one is off screen: the
+  // page appears not to have reacted. Bring it into view, but only when it is
+  // actually out of view — scrolling a fix the reader is already looking at
+  // just moves the page under them.
+  useEffect(() => {
+    if (!openAll) return;
+    const id = requestAnimationFrame(() => {
+      const firstErr = document.querySelector('#transcript .err');
+      const line = firstErr?.closest('.tline') as HTMLElement | null;
+      if (!line) return;
+      const r = line.getBoundingClientRect();
+      const inView = r.top >= 0 && r.bottom <= window.innerHeight;
+      if (!inView) line.scrollIntoView({ behavior: SMOOTH, block: 'center' });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [openAll]);
 
   useEffect(() => {
     const stored = Dismissed.all().filter((d) => d.language === lang.code);

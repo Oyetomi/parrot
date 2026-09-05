@@ -110,10 +110,14 @@ function ErrorSpan({
 }) {
   return (
     <span
-      className={`err${open ? ' open' : ''}`}
+      className={`err${open ? ' open' : ''}${corrected ? ' fixed' : ''}`}
       role="button"
       tabIndex={0}
-      aria-label={`Mistake: ${err.said}. Activate for the correction.`}
+      aria-label={
+        corrected
+          ? `Corrected to: ${err.correction}. Was: ${err.said}.`
+          : `Possible issue: ${err.said}. Activate for the correction.`
+      }
       onClick={onOpen}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
       ref={(el) => registerSpan(err.start, err.end, el)}

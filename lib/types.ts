@@ -2,6 +2,12 @@ export interface Word {
   word: string;
   start: number;
   end: number;
+  /**
+   * Whisper was unsure it heard this stretch correctly. A "mistake" found here
+   * is more likely to be the transcriber's than the speaker's, so the analysis
+   * is not allowed to correct it.
+   */
+  uncertain?: boolean;
 }
 
 export interface Pause {

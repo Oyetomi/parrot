@@ -77,11 +77,26 @@ async function throwApi(res: Response): Promise<never> {
   throw new ApiError(message, res.status, code, partial);
 }
 
+interface WhisperSegment {
+  start: number;
+  end: number;
+  avg_logprob?: number;
+  no_speech_prob?: number;
+}
+
 interface WhisperResponse {
   text?: string;
   language?: string;
   words?: { word?: string; start: number; end: number }[];
+  segments?: WhisperSegment[];
 }
+
+// Whisper reports how sure it was, per segment. Below this the transcript of
+// that stretch is doubtful, and a "mistake" found inside it is more likely to
+// be Whisper's than the speaker's. avg_logprob runs about -0.1 on clean speech
+// and falls away sharply as the audio gets harder.
+const SHAKY_LOGPROB = -0.62;
+const SHAKY_NO_SPEECH = 0.5;
 
 /**
  * Transcribe one or more chunks, stitching timestamps back onto one timeline.
@@ -130,11 +145,21 @@ export async function transcribe({
     detected = detected || data.language || '';
     text += (text ? ' ' : '') + (data.text ?? '').trim();
 
+    // A word inherits the confidence of the segment it falls inside, so the
+    // analysis can refuse to correct anything Whisper was unsure it heard.
+    const shaky = (data.segments ?? []).filter(
+      (sg) =>
+        (sg.avg_logprob ?? 0) < SHAKY_LOGPROB ||
+        (sg.no_speech_prob ?? 0) > SHAKY_NO_SPEECH,
+    );
+
     for (const w of data.words ?? []) {
+      const uncertain = shaky.some((sg) => w.start >= sg.start && w.start <= sg.end);
       words.push({
         word: (w.word ?? '').trim(),
         start: +(w.start + offset).toFixed(3),
         end: +(w.end + offset).toFixed(3),
+        uncertain,
       });
     }
     onChunk?.(i + 1, chunks.length);

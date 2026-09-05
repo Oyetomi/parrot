@@ -228,8 +228,20 @@ h2{font-size:clamp(24px,4.2vw,32px);line-height:1.08}
 .err sup{font-family:'IBM Plex Mono',monospace;font-size:9.5px;font-weight:600;text-decoration:none;
   display:inline-block;vertical-align:super;margin-left:2px}
 .crutch{background:var(--or-soft);border-radius:3px;padding:1px 4px;color:var(--or)}
-body.corrected .err{color:var(--menthe);background:var(--menthe-soft);text-decoration-color:transparent;padding:1px 5px}
-body.corrected .err sup{display:none}
+/* Corrected view. A wavy underline is the universal "something is wrong here"
+   mark, so it is dropped entirely rather than recoloured — green wavy would
+   still read as a problem. What is left says "this span was changed": green
+   text on a soft green chip, with a thin solid rule underneath. */
+.err.fixed{
+  color:var(--menthe);
+  background:var(--menthe-soft);
+  text-decoration:none;
+  border-bottom:1.5px solid var(--menthe);
+  padding:1px 6px;
+  border-radius:4px;
+}
+.err.fixed:hover,.err.fixed.open{background:var(--menthe-soft);filter:brightness(1.06)}
+.err.fixed sup{display:none}
 
 .fixcard{display:grid;grid-column:1/-1;overflow:hidden;grid-template-rows:0fr;
   transition:grid-template-rows .3s cubic-bezier(.4,0,.2,1)}
@@ -283,6 +295,12 @@ body.corrected .err sup{display:none}
 @media(max-width:600px){.stalls li{grid-template-columns:66px 52px;row-gap:3px}.stalls .jump{grid-column:1/-1}}
 
 /* ===== fixes ===== */
+.filternote{
+  margin:0 0 22px;padding:13px 16px;font-size:13.5px;line-height:1.6;
+  color:var(--ink2);background:var(--card);border:1px solid var(--line);
+  border-left:3px solid var(--or);border-radius:var(--radius);max-width:70ch;
+}
+.filternote b{color:var(--ink);font-weight:600}
 .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px}
 .fixes{list-style:none;margin:0;padding:0;display:grid;gap:1px;background:var(--line);
   border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}

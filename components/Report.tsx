@@ -33,6 +33,10 @@ export interface ReportData {
   crossChecked: boolean;
   prior: Session[];
   sttModel: string;
+  /** Findings dropped by the deterministic checks before anything was shown. */
+  rejected: number;
+  /** Words Whisper was unsure it heard, which are never corrected. */
+  uncertainWords: number;
 }
 
 export function Report({ data, onAgain }: { data: ReportData; onAgain: () => void }) {
@@ -96,12 +100,12 @@ export function Report({ data, onAgain }: { data: ReportData; onAgain: () => voi
             n={`While actually speaking · ${data.pace.overall} ${unitShort} counting silence`} />
           <Cell k="Dead air" v={<>{data.deadAir.percent}<small>%</small></>}
             n={`${data.pauses.length} pause${data.pauses.length === 1 ? '' : 's'} over 0.6 seconds`} />
-          <Cell k="Mistakes marked" v={<>{errors.length}</>}
+          <Cell k="Worth checking" v={<>{errors.length}</>}
             n={errors.length
               ? data.crossChecked
-                ? `${confirmed} of ${errors.length} confirmed by a second pass`
+                ? `${confirmed} of ${errors.length} found by both passes`
                 : 'Single pass — none cross-checked'
-              : 'Nothing worth correcting'} />
+              : 'Nothing flagged'} />
           {data.levelReliable ? (
             <Cell k="Level" v={level.reaching ? <>{level.band}<small> → {level.reaching}</small></> : <>{level.band}</>}
               n={`${level.framework} estimate · ${data.words.length} words spoken`} />
@@ -148,9 +152,32 @@ export function Report({ data, onAgain }: { data: ReportData; onAgain: () => voi
         </section>
 
         <section className="wrap" id="fixes">
-          <div className="sechead"><span className="secnum">03</span><h2>Every fix, worst first</h2></div>
+          <div className="sechead"><span className="secnum">03</span><h2>Worth checking, worst first</h2></div>
           {errors.length ? (
-            <p className="lede">Ranked by how much each one costs you, not by how often it appears.</p>
+            <p className="lede">
+              Ranked by how much each would cost you, not by how often it appears. These are
+              a well-informed second opinion, not a verdict — if you know a form is right
+              where you speak, you are right and this is wrong.
+            </p>
+          ) : null}
+          {(data.rejected > 0 || data.uncertainWords > 0) ? (
+            <p className="filternote">
+              {data.rejected > 0 ? (
+                <>
+                  <b>{data.rejected}</b> further {data.rejected === 1 ? 'finding was' : 'findings were'}{' '}
+                  discarded before you saw {data.rejected === 1 ? 'it' : 'them'}: the quoted text
+                  did not match the transcript, or the correction was identical to what was said.
+                </>
+              ) : null}
+              {data.rejected > 0 && data.uncertainWords > 0 ? ' ' : null}
+              {data.uncertainWords > 0 ? (
+                <>
+                  <b>{data.uncertainWords}</b> {data.uncertainWords === 1 ? 'word was' : 'words were'}{' '}
+                  transcribed with low confidence and are never corrected — a mistake there is
+                  more likely the transcriber&apos;s than yours.
+                </>
+              ) : null}
+            </p>
           ) : null}
           <Fixes errors={errors} words={data.words} />
         </section>

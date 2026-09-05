@@ -35,6 +35,7 @@ export const SCHEMA_NOTE = `Return one JSON object with exactly these keys:
       "category": string,           // one lowercase word: gender, preposition,
                                     // agreement, tense, article, word-order,
                                     // vocabulary, meaning, particle, counter…
+      "confidence": string,         // "high" | "medium" | "low" — see the rules
       "note": string,               // 1-3 sentences: the RULE, not just the fix
       "gloss": string               // what the speaker was trying to say, in English
     }
@@ -57,12 +58,45 @@ or accent: you are reading a machine transcript that normalises pronunciation
 toward the standard form of the language, so any pronunciation claim would be
 invented. Say nothing about it.
 
+You are reading a MACHINE TRANSCRIPT of speech, not something the speaker wrote.
+That has a consequence you must hold on to throughout: when a passage looks
+wrong, the likeliest explanation is often that the transcriber misheard it, not
+that the speaker erred. Correcting the transcriber's mistake and presenting it
+to the speaker as their own is the worst thing you can do here — it teaches them
+something false and they have no way to know it. When you cannot tell the two
+apart, say nothing.
+
+Telling a correct speaker they were wrong is far more damaging than missing a
+mistake. Where it is close, stay silent.
+
+Do NOT mark any of these. None of them is an error:
+- Regional and dialectal forms. Quebec, Belgian, African, Caribbean French;
+  Latin American against Peninsular Spanish; Arabic dialects against MSA; and
+  so on for every language. Different is not wrong.
+- Ordinary spoken register. Speech is not writing. Dropped negative particles,
+  contractions, informal pronouns, ellipsis and loose word order are all normal
+  in conversation and correct as spoken.
+- Disfluency: false starts, repetitions, self-corrections, filler, trailing off.
+  These are how spontaneous speech works in every language, including among
+  native speakers. Mark them under "fillers" if anything, never as errors.
+- Anything whose apparent wrongness could equally be a transcription slip —
+  a near-homophone, a missing short function word, a garbled proper noun.
+- Punctuation, capitalisation and spelling. The speaker did not produce those;
+  the transcriber did.
+
+Set "confidence" honestly:
+- "high"   — unambiguously wrong in every register and region, and clearly what
+             the speaker actually said.
+- "medium" — probably an error, but register or transcription could explain it.
+- "low"    — you are unsure. Prefer omitting it entirely over a low mark.
+
 Rules:
 - Rank errors by how much they damage comprehension, not by frequency. An error
   that inverts the meaning of a sentence outranks a gender slip.
 - "note" must teach the underlying rule so it generalises, not just state the fix.
-- Only mark real errors. Regional and colloquial forms are not mistakes. If the
-  speaker is fluent, return few errors or none — do not invent them to fill space.
+- Only mark real errors. If the speaker is fluent, return few errors or none.
+  Returning an empty "errors" array is a perfectly good answer and is strongly
+  preferred over padding the list. You are not graded on finding something.
 - "start" and "end" are indices into the numbered word list, inclusive. The span
   must be tight: cover the error and the words needed to correct it, nothing more.
 - "said" must reproduce those exact words. "correction" replaces exactly that span.

@@ -12,6 +12,7 @@ export const SpanSchema = z.object({
 
 export const ErrorSchema = SpanSchema.extend({
   rank: z.number().int().positive().optional(),
+  confidence: z.enum(['high', 'medium', 'low']).default('medium'),
   said: z.string().default(''),
   correction: z.string().default(''),
   category: z.string().default('other'),
@@ -124,6 +125,7 @@ export const ANALYSIS_JSON_SCHEMA = obj({
     items: obj({
       rank: int, start: int, end: int,
       said: str, correction: str, category: str, note: str, gloss: str,
+      confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
     }),
   },
   fillers: { type: 'array', items: obj({ start: int, end: int, note: str }) },

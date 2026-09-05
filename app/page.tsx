@@ -13,6 +13,7 @@ import { profile } from '@/lib/languages';
 import { systemPrompt, userPrompt } from '@/lib/prompt';
 import { cleanSpans } from '@/lib/schema';
 import { crossCheck, singlePass } from '@/lib/agreement';
+import { verify } from '@/lib/verify';
 import * as History from '@/lib/history';
 import { MIN_WORDS_FOR_LEVEL, type Phase, type StepId } from '@/lib/types';
 
@@ -104,9 +105,15 @@ export default function Home() {
 
       const analysis = first;
       const max = words.length - 1;
-      const errors = second
+      const proposed = second
         ? crossCheck(cleanSpans(first.errors, max), cleanSpans(second.errors, max))
         : singlePass(cleanSpans(first.errors, max));
+
+      // Nothing reaches the report until it clears the deterministic checks:
+      // the quoted text must match the words it points at, and Whisper must
+      // have been confident it heard them. Telling a correct speaker they were
+      // wrong is the failure worth spending effort to avoid.
+      const { kept: errors, rejected } = verify(proposed, words);
       const fillers = cleanSpans(analysis.fillers, max);
       const crossChecked = !!second;
 
@@ -142,6 +149,8 @@ export default function Home() {
         errors, fillers, analysis, lang, pauses, stalls, deadAir, pace, duration,
         envelope, audioUrl: A.playableUrl(samples), filename: file.name,
         levelReliable, errorsPer100, crossChecked, prior, sttModel,
+        rejected: rejected.length,
+        uncertainWords: words.filter((w) => w.uncertain).length,
       });
       setPhase('report');
       window.scrollTo({ top: 0 });

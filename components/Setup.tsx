@@ -36,6 +36,49 @@ export function Setup({
   return (
     <main>
       <section className="wrap">
+        {!hasKey ? (
+          <div className="keycall">
+            <div className="keycall-head">
+              <span className="keycall-badge">Step 1</span>
+              <h2>Get a free Groq API key</h2>
+            </div>
+            <p>
+              Parrot has no server of its own, so it uses yours. The key stays in this
+              browser and talks straight to Groq — nothing is uploaded to us, because
+              there is no us to upload it to.
+            </p>
+            <ol className="keysteps">
+              <li>
+                Open{' '}
+                <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">
+                  console.groq.com/keys
+                </a>{' '}
+                and sign in with Google or GitHub. No card needed.
+              </li>
+              <li>Press <b>Create API Key</b>, give it any name.</li>
+              <li>Copy it straight away — Groq shows it once, then never again.</li>
+              <li>Paste it below.</li>
+            </ol>
+            <div className="keycall-actions">
+              <button className="cta small" type="button" onClick={onNeedKey}>
+                Paste my key
+              </button>
+              <a
+                className="ghost dark"
+                href="https://console.groq.com/keys"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open Groq console ↗
+              </a>
+            </div>
+            <p className="keyfree">
+              The free tier covers roughly <b>8 hours of audio a day</b> — far more than
+              this needs.
+            </p>
+          </div>
+        ) : null}
+
         <div
           className={`drop${over ? ' over' : ''}${file ? ' has' : ''}`}
           tabIndex={0}

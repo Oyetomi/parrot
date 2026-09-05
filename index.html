@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Parrot — hear yourself speak</title>
+<meta name="description" content="Upload a recording in any language. Get a word-synced transcript, your speaking pace, every pause, and every mistake explained.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦜</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Spectral:ital,wght@0,400;0,500;1,400&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<audio id="au" preload="metadata"></audio>
+
+<header class="studio">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">🦜</span>
+        <span class="brandname">Parrot</span>
+      </div>
+      <div class="topactions">
+        <button class="ghost" id="btnKey" type="button">API key</button>
+        <a class="ghost" href="https://github.com" id="repoLink" target="_blank" rel="noopener">Source</a>
+      </div>
+    </div>
+
+    <div id="heroCopy">
+      <h1>Hear yourself <span class="accent">speak</span></h1>
+      <p class="hero-dek">Upload a recording in any language. Parrot transcribes it with word-level timing, measures where you hesitated, and marks every mistake with the rule behind it — then plays it back word by word.</p>
+    </div>
+
+    <!-- PLAYER (report only) -->
+    <div class="player" id="player" hidden>
+      <div class="ptop">
+        <button class="playbtn" id="play" type="button" aria-label="Play the recording">
+          <svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+          <svg class="ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+        </button>
+        <div class="wavebox"><canvas id="wave" aria-label="Waveform. Click to jump."></canvas></div>
+      </div>
+      <div class="pbot">
+        <div class="timecode"><b id="cur">0:00</b> / <span id="dur">0:00</span> &nbsp;·&nbsp; <span id="nowword">press play</span></div>
+        <div class="rates">
+          <span class="lab">Speed</span>
+          <button class="rate" type="button" data-rate="0.75">0.75×</button>
+          <button class="rate" type="button" data-rate="1" aria-pressed="true">1×</button>
+          <button class="rate" type="button" data-rate="1.25">1.25×</button>
+        </div>
+      </div>
+      <div class="wavekey">
+        <span><i style="background:var(--wave-on)"></i>Speech</span>
+        <span><i style="background:var(--wave-pause)"></i><span id="pauseKey">Pauses</span></span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ SETUP ============ -->
+<main id="setup">
+  <section class="wrap">
+    <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose an audio or video file">
+      <input type="file" id="file" accept="audio/*,video/*,.mov,.mp4,.m4a,.mp3,.wav,.ogg,.flac,.webm" hidden>
+      <div class="dropinner">
+        <div class="dropicon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+        </div>
+        <p class="dropmain">Drop a video or audio file</p>
+        <p class="dropsub">or click to choose · mp3, wav, m4a, ogg, flac, mp4, mov, webm</p>
+        <p class="dropnote">Your file never leaves your machine. Parrot strips the audio in the browser and uploads only that.</p>
+      </div>
+    </div>
+
+    <div class="setupgrid">
+      <div class="field">
+        <label for="lang">Language</label>
+        <select id="lang">
+          <option value="">Detect automatically</option>
+        </select>
+        <p class="fieldnote">Whisper detects 99 languages. Override only if detection gets it wrong.</p>
+      </div>
+      <div class="field">
+        <label for="model">Analysis model</label>
+        <select id="model">
+          <option value="openai/gpt-oss-120b">GPT-OSS 120B — best explanations</option>
+          <option value="llama-3.3-70b-versatile">Llama 3.3 70B — solid all-round</option>
+          <option value="openai/gpt-oss-20b">GPT-OSS 20B — fastest</option>
+        </select>
+        <p class="fieldnote">All on Groq's free tier. Bigger models write better grammar notes.</p>
+      </div>
+    </div>
+
+    <div class="startrow">
+      <button class="cta" id="btnStart" type="button" disabled>Choose a file to begin</button>
+      <span class="startnote" id="startNote"></span>
+    </div>
+  </section>
+
+  <section class="wrap howto">
+    <div class="sechead"><span class="secnum">How it works</span></div>
+    <ol class="steps-static">
+      <li><b>Audio is extracted locally.</b> The browser decodes your file and downsamples it to 16&nbsp;kHz mono. A 32&nbsp;MB video becomes about 1&nbsp;MB of audio — which is also how it fits under Groq's 25&nbsp;MB free-tier cap.</li>
+      <li><b>Whisper transcribes it with word timings.</b> <code>whisper-large-v3-turbo</code> returns every word with a start and end time. That is what drives the read-along and the pause detection.</li>
+      <li><b>The numbers are computed here, not by an AI.</b> Speaking rate, pauses, dead air and stalls are arithmetic over the word list — no model involved, no room for invention.</li>
+      <li><b>Only the error analysis uses an LLM.</b> It receives the numbered word list and returns mistakes anchored to word indices, so every correction points at real audio you can replay.</li>
+    </ol>
+  </section>
+</main>
+
+<!-- ============ PROGRESS ============ -->
+<main id="working" hidden>
+  <section class="wrap">
+    <h2 class="worktitle">Working on <span id="workfile">your recording</span></h2>
+    <ol class="steps" id="steps"></ol>
+    <p class="workerr" id="workerr" hidden></p>
+    <button class="ghost dark" id="btnCancel" type="button">Start over</button>
+  </section>
+</main>
+
+<!-- ============ REPORT ============ -->
+<main id="report" hidden>
+  <div class="score"><div class="wrap" id="scoreRow"></div></div>
+
+  <section class="wrap" id="listen">
+    <div class="sechead"><span class="secnum">01</span><h2>Read along, mistakes and all</h2></div>
+    <p class="lede" id="listenLede"></p>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Transcript version">
+        <button id="btnSaid" type="button" aria-pressed="true">What was said</button>
+        <button id="btnFixed" type="button" aria-pressed="false">Corrected</button>
+      </div>
+      <button class="chip" id="btnFollow" type="button" aria-pressed="true"><i class="dot"></i>Auto-scroll</button>
+      <button class="chip" id="btnAll" type="button">Open all fixes</button>
+      <span class="hint">Space to play · ← → to skip 5s</span>
+    </div>
+    <div id="transcript"></div>
+  </section>
+
+  <section class="wrap">
+    <div class="sechead"><span class="secnum">02</span><h2>Where the time went</h2></div>
+    <p class="lede" id="paceLede"></p>
+    <div class="pace" id="paceBox"></div>
+    <ul class="stalls" id="stalls"></ul>
+    <p class="lede" id="stallNote" style="margin:24px 0 0"></p>
+  </section>
+
+  <section class="wrap" id="fixes">
+    <div class="sechead"><span class="secnum">03</span><h2>Every fix, worst first</h2></div>
+    <p class="lede" id="fixLede"></p>
+    <div class="filters" id="filters"></div>
+    <ol class="fixes" id="fixlist"></ol>
+  </section>
+
+  <section class="wrap">
+    <div class="sechead"><span class="secnum">04</span><h2>The verdict, and what to drill</h2></div>
+    <div class="verdict" id="verdict"></div>
+    <ol class="drills" id="drills"></ol>
+  </section>
+
+  <section class="wrap">
+    <div class="againrow">
+      <button class="cta" id="btnAgain" type="button">Analyse another recording</button>
+      <button class="ghost" id="btnJson" type="button">Download the raw JSON</button>
+    </div>
+  </section>
+</main>
+
+<div class="mini" id="mini">
+  <button class="playbtn" type="button" data-play aria-label="Play or pause">
+    <svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+    <svg class="ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+  </button>
+  <div class="miniprog" id="miniprog"><i id="minibar"></i></div>
+  <div class="timecode"><b id="cur2">0:00</b></div>
+</div>
+
+<!-- ============ KEY DIALOG ============ -->
+<dialog id="keyDlg" class="dlg">
+  <form method="dialog" class="dlginner">
+    <h3>Your Groq API key</h3>
+    <p class="dlgnote">Parrot has no backend. Your key is stored in this browser's <code>localStorage</code> and sent straight from this page to Groq — it never touches a server of ours, because there isn't one.</p>
+    <label for="keyInput">API key</label>
+    <input type="password" id="keyInput" placeholder="gsk_…" autocomplete="off" spellcheck="false">
+    <p class="dlgnote">Get a free one at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>. The free tier covers 8 hours of audio a day.</p>
+    <div class="dlgrow">
+      <button class="cta small" id="keySave" value="save" type="submit">Save key</button>
+      <button class="ghost" id="keyClear" value="clear" type="submit">Forget it</button>
+    </div>
+  </form>
+</dialog>
+
+<footer>
+  <div class="wrap">
+    <p>Transcription by <b>Whisper large-v3-turbo</b> on Groq. Analysis by an LLM you pick.<br>Pace, pauses and stalls are computed locally from word timings.</p>
+    <p>Caveat, and it matters: Whisper normalises pronunciation toward the standard<br>form of a language, so <b>accent and phoneme errors are under-reported</b>.<br>Parrot judges grammar and word choice. Your ears judge the rest.</p>
+  </div>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

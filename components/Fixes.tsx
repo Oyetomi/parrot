@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { usePlayback } from './Playback';
 import { FixBody } from './Transcript';
+import { plainCategory } from '@/lib/text';
 import type { RankedError } from '@/lib/schema';
 import type { Word } from '@/lib/types';
 
@@ -37,7 +38,7 @@ export function Fixes({ errors, words }: { errors: RankedError[]; words: Word[] 
             aria-pressed={tag === t}
             onClick={() => setTag(t)}
           >
-            {t === 'all' ? `All ${errors.length}` : t}
+            {t === 'all' ? `All ${errors.length}` : plainCategory(t)}
           </button>
         ))}
       </div>

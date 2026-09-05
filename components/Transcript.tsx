@@ -3,7 +3,7 @@
 import { Fragment, useState } from 'react';
 import { usePlayback } from './Playback';
 import { fmtTime } from '@/lib/metrics';
-import { rich, esc } from '@/lib/text';
+import { rich, plainCategory } from '@/lib/text';
 import type { Filler, RankedError } from '@/lib/schema';
 import type { LanguageProfile, Word } from '@/lib/types';
 
@@ -146,7 +146,7 @@ export function FixBody({ err }: { err: RankedError }) {
         <span className="said-b">{err.said}</span>
         <span className="arrow">→</span>
         <span className="want-b">{err.correction}</span>
-        <span className="tag">{esc(err.category)}</span>
+        <span className="tag">{plainCategory(err.category)}</span>
         <span className={`tag conf ${err.confirmed ? 'yes' : 'no'}`}>
           {err.confirmed ? '✓ confirmed twice' : '· found once'}
         </span>

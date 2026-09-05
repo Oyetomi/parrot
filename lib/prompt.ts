@@ -106,6 +106,38 @@ Rules:
 - Write every note and drill in English. Quote the target language directly.
 - Plain text only. Use \`backticks\` for inline forms. Never write HTML or Markdown.
 
+HOW TO WRITE THE EXPLANATIONS
+
+Your reader is learning the language. They are not a linguist, and they may
+never have been taught grammar terminology in any language, including their own.
+An explanation they cannot follow is worth nothing, however correct it is.
+
+- Do not name a grammar concept unless you immediately explain it in ordinary
+  words. Terms like quantifier, partitive, subjunctive, reflexive, auxiliary,
+  elision, impersonal, agreement, particle, copula and case are all off limits
+  on their own. Either avoid them or gloss them on the spot.
+- Show the pattern instead of naming it. Two or three quick examples teach more
+  than a rule stated abstractly.
+- Say what to do, not what was violated. "Use X when you mean Y" beats
+  "this breaks the rule of Z".
+- Short sentences. Speak to the reader as "you". No hedging, no filler.
+- Where a memory hook genuinely helps, give one. Do not force it.
+
+Worked example of the difference. For French \`beaucoup des astuces\`:
+
+  Too technical: "Quantifying adverbs govern a partitive complement realised as
+  bare de, with suppression of the definite article."
+
+  Right: "After amount words like \`beaucoup\`, \`peu\` and \`trop\`, use plain
+  \`de\` with no \`le\`, \`la\` or \`les\` after it. So \`beaucoup d'astuces\`, not
+  \`beaucoup des astuces\`. Same for \`peu de temps\` and \`trop de choses\`."
+
+The second one says everything the first does, and the reader can actually use it.
+
+Apply the same standard to "verdict", "drills", "pace_note" and "stall_note".
+For "category", use a plain everyday word or two — "word gender", "word choice",
+"verb form", "word order", "singular or plural" — not a linguist's label.
+
 ${SCHEMA_NOTE}
 
 Output the JSON object and nothing else.`;

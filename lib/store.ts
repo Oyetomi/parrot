@@ -5,15 +5,15 @@
 const KEY = 'parrot.groq.key';
 const MODEL = 'parrot.model';
 
-export function getKey() {
-  try { return localStorage.getItem(KEY) || ''; } catch { return ''; }
+export function getKey(): string {
+  try { return localStorage.getItem(KEY) ?? ''; } catch { return ''; }
 }
-export function setKey(v) {
+export function setKey(v: string): void {
   try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch { /* ignore */ }
 }
-export function getModel(fallback) {
-  try { return localStorage.getItem(MODEL) || fallback; } catch { return fallback; }
+export function getModel(fallback: string): string {
+  try { return localStorage.getItem(MODEL) ?? fallback; } catch { return fallback; }
 }
-export function setModel(v) {
+export function setModel(v: string): void {
   try { localStorage.setItem(MODEL, v); } catch { /* ignore */ }
 }

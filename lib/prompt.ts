@@ -12,6 +12,8 @@
 //    cannot script the page. The renderer escapes everything and converts
 //    backtick spans itself.
 
+import type { Stats, Word } from './types';
+
 export const SCHEMA_NOTE = `Return one JSON object with exactly these keys:
 
 {
@@ -47,7 +49,7 @@ export const SCHEMA_NOTE = `Return one JSON object with exactly these keys:
   "stall_note": string              // one sentence on WHERE they hesitate
 }`;
 
-export function systemPrompt() {
+export function systemPrompt(): string {
   return `You are an exacting, warm language tutor reviewing a spoken recording.
 
 You judge GRAMMAR, WORD CHOICE and IDIOM. You must not comment on pronunciation
@@ -75,9 +77,17 @@ ${SCHEMA_NOTE}
 Output the JSON object and nothing else.`;
 }
 
-export function userPrompt({ words, language, stats }) {
+export function userPrompt({
+  words,
+  language,
+  stats,
+}: {
+  words: Word[];
+  language: string;
+  stats: Stats;
+}): string {
   const numbered = words.map((w, i) => `${i}\t${w.word}`).join('\n');
-  const plain = words.map(w => w.word).join(' ');
+  const plain = words.map((w) => w.word).join(' ');
 
   return `Language spoken: ${language}
 

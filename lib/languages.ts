@@ -12,10 +12,21 @@
 // These bands are rough ranges for unhurried conversational speech, good
 // enough to tell "halting" from "fluent". They are not measured constants.
 
-const CJK = { unit: 'chars', unitLabel: 'characters per minute' };
-const WORDS = { unit: 'words', unitLabel: 'words per minute' };
+import type { CountUnit, LanguageProfile } from './types';
 
-export const LANGUAGES = {
+interface Entry {
+  name: string;
+  band: [number, number];
+  unit: CountUnit;
+  unitLabel: string;
+  framework: string;
+  rtl?: boolean;
+}
+
+const CJK = { unit: 'chars' as CountUnit, unitLabel: 'characters per minute' };
+const WORDS = { unit: 'words' as CountUnit, unitLabel: 'words per minute' };
+
+export const LANGUAGES: Record<string, Entry> = {
   en: { name: 'English',    band: [140, 180], ...WORDS, framework: 'CEFR' },
   fr: { name: 'French',     band: [150, 180], ...WORDS, framework: 'CEFR' },
   es: { name: 'Spanish',    band: [160, 200], ...WORDS, framework: 'CEFR' },
@@ -41,13 +52,13 @@ export const LANGUAGES = {
 };
 
 /** Everything the report needs to talk about a language, baseline or not. */
-export function profile(code) {
-  const key = (code || '').slice(0, 2).toLowerCase();
+export function profile(code: string | undefined): LanguageProfile {
+  const key = (code ?? '').slice(0, 2).toLowerCase();
   const hit = LANGUAGES[key];
-  if (hit) return { code: key, benchmarked: true, rtl: false, ...hit };
+  if (hit) return { code: key, rtl: false, benchmarked: true, ...hit };
   return {
     code: key || 'und',
-    name: displayName(key) || 'this language',
+    name: displayName(key) ?? 'this language',
     band: null,
     unit: 'words',
     unitLabel: 'words per minute',
@@ -57,17 +68,17 @@ export function profile(code) {
   };
 }
 
-function displayName(code) {
+function displayName(code: string): string | null {
   if (!code) return null;
   try {
-    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code);
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? null;
   } catch {
     return null;
   }
 }
 
 /** Options for the language override dropdown. */
-export function options() {
+export function options(): { code: string; name: string }[] {
   return Object.entries(LANGUAGES)
     .map(([code, l]) => ({ code, name: l.name }))
     .sort((a, b) => a.name.localeCompare(b.name));

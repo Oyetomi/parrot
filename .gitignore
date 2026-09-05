@@ -1,4 +1,8 @@
 .DS_Store
 node_modules/
+.next/
+out/
 .vercel
 *.log
+next-env.d.ts
+*.tsbuildinfo

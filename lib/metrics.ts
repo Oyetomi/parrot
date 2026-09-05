@@ -2,9 +2,11 @@
 // Pace, pauses, dead air and stalls are arithmetic over Whisper's word
 // timings, so they cannot be hallucinated and cost nothing to produce.
 
+import type { CountUnit, DeadAir, Pause, Stall, Word } from './types';
+
 /** Gaps between consecutive words, longer than `min` seconds. */
-export function pauses(words, min = 0.6) {
-  const out = [];
+export function pauses(words: Word[], min = 0.6): Pause[] {
+  const out: Pause[] = [];
   for (let i = 1; i < words.length; i++) {
     const gap = words[i].start - words[i - 1].end;
     if (gap >= min) {
@@ -24,57 +26,65 @@ export function pauses(words, min = 0.6) {
  * tokenises by character (Chinese, Japanese, Thai) counting "words" is
  * meaningless, so we count characters instead.
  */
-export function rate(words, duration, unit = 'words') {
+export function rate(words: Word[], duration: number, unit: CountUnit = 'words'): number {
   if (!duration) return 0;
-  const n = unit === 'chars'
-    ? words.reduce((sum, w) => sum + w.word.replace(/\s/g, '').length, 0)
-    : words.length;
+  const n =
+    unit === 'chars'
+      ? words.reduce((sum, w) => sum + w.word.replace(/\s/g, '').length, 0)
+      : words.length;
   return Math.round((n / duration) * 60);
 }
 
 /** Share of the clip spent in pauses over the threshold. */
-export function deadAir(pauseList, duration) {
+export function deadAir(pauseList: Pause[], duration: number): DeadAir {
   if (!duration) return { seconds: 0, percent: 0 };
   const seconds = pauseList.reduce((s, p) => s + p.seconds, 0);
   return { seconds: +seconds.toFixed(1), percent: Math.round((seconds / duration) * 100) };
 }
 
 /** The longest hesitations, with the words they preceded. */
-export function stalls(words, pauseList, limit = 5) {
+export function stalls(words: Word[], pauseList: Pause[], limit = 5): Stall[] {
   return [...pauseList]
     .sort((a, b) => b.seconds - a.seconds)
     .slice(0, limit)
-    .map(p => ({
+    .map((p) => ({
       ...p,
-      phrase: words.slice(p.beforeIndex, p.beforeIndex + 4).map(w => w.word).join(' '),
+      phrase: words.slice(p.beforeIndex, p.beforeIndex + 4).map((w) => w.word).join(' '),
     }));
 }
 
 /** Group words into readable lines, breaking on sentence ends and long gaps. */
-export function lines(words, maxWords = 18) {
-  const out = [];
+export function lines(words: Word[], maxWords = 18): number[] {
+  const out: number[] = [];
   let start = 0;
   for (let i = 0; i < words.length; i++) {
-    const w = words[i].word;
-    const endsSentence = /[.!?。！？]$/.test(w.trim());
+    const endsSentence = /[.!?。！？]$/.test(words[i].word.trim());
     const nextGap = i + 1 < words.length ? words[i + 1].start - words[i].end : 0;
     const run = i - start + 1;
     const shouldBreak =
-      i === words.length - 1 ||
-      (endsSentence && run >= 6) ||
-      nextGap >= 2.0 ||
-      run >= maxWords;
+      i === words.length - 1 || (endsSentence && run >= 6) || nextGap >= 2.0 || run >= maxWords;
     if (shouldBreak) {
       out.push(start);
       start = i + 1;
     }
   }
-  return out.filter((v, i, a) => a.indexOf(v) === i);
+  return out;
 }
 
-export function fmtTime(t) {
-  t = Math.max(0, t || 0);
-  const m = Math.floor(t / 60);
-  const s = Math.floor(t % 60);
-  return m + ':' + String(s).padStart(2, '0');
+/**
+ * Line breaks must never fall inside an error span: the span would be split
+ * across two paragraphs and half of it orphaned.
+ */
+export function lineStartsAvoiding(
+  words: Word[],
+  spans: { start: number; end: number }[],
+): number[] {
+  return lines(words).filter((s) => !spans.some((e) => s > e.start && s <= e.end));
+}
+
+export function fmtTime(t: number): string {
+  const v = Math.max(0, t || 0);
+  const m = Math.floor(v / 60);
+  const s = Math.floor(v % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
 }

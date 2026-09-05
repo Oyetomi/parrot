@@ -53,8 +53,16 @@ export type Filler = z.infer<typeof FillerSchema>;
 export type Level = z.infer<typeof LevelSchema>;
 export type Drill = z.infer<typeof DrillSchema>;
 
-/** An error span that has been validated against the real word list. */
-export type RankedError = AnalysisError & { rank: number };
+/**
+ * An error span validated against the real word list.
+ *
+ * `confirmed` records whether a second, independent pass over the same
+ * transcript found the same mistake. The analysis runs at a non-zero
+ * temperature, so a single pass is one opinion; agreement between two is a
+ * cheap and honest reliability signal, and disagreement is worth showing
+ * rather than hiding.
+ */
+export type RankedError = AnalysisError & { rank: number; confirmed: boolean };
 
 /**
  * Model output is not trusted to be well-formed. Indices are clamped to the

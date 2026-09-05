@@ -143,6 +143,9 @@ export function FixBody({ err }: { err: RankedError }) {
         <span className="arrow">→</span>
         <span className="want-b">{err.correction}</span>
         <span className="tag">{esc(err.category)}</span>
+        <span className={`tag conf ${err.confirmed ? 'yes' : 'no'}`}>
+          {err.confirmed ? '✓ confirmed twice' : '· found once'}
+        </span>
       </div>
       <p className="fixnote" dangerouslySetInnerHTML={rich(err.note)} />
       {err.gloss ? <p className="gloss">meaning: {err.gloss}</p> : null}

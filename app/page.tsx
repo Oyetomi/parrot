@@ -11,8 +11,10 @@ import * as M from '@/lib/metrics';
 import * as Store from '@/lib/store';
 import { profile } from '@/lib/languages';
 import { systemPrompt, userPrompt } from '@/lib/prompt';
-import { cleanSpans, type RankedError } from '@/lib/schema';
-import type { Phase, StepId } from '@/lib/types';
+import { cleanSpans } from '@/lib/schema';
+import { crossCheck, singlePass } from '@/lib/agreement';
+import * as History from '@/lib/history';
+import { MIN_WORDS_FOR_LEVEL, type Phase, type StepId } from '@/lib/types';
 
 const DEFAULT_MODEL = G.ANALYSIS_MODELS[0].id;
 
@@ -21,6 +23,8 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [model, setModel] = useState<string>(DEFAULT_MODEL);
   const [language, setLanguage] = useState('');
+  const [sttModel, setSttModel] = useState<string>(G.STT_MODEL);
+  const [doubleCheck, setDoubleCheck] = useState(true);
   const [hasKey, setHasKey] = useState(false);
   const [keyOpen, setKeyOpen] = useState(false);
   const [step, setStep] = useState<StepId>('extract');
@@ -59,6 +63,7 @@ export default function Home() {
       const stt = await G.transcribe({
         chunks,
         apiKey,
+        model: sttModel,
         language: language || undefined,
         onChunk: (i, n) => { if (n > 1) setMeta((m) => ({ ...m, upload: `part ${i} of ${n}` })); },
       });
@@ -67,12 +72,12 @@ export default function Home() {
 
       setStep('measure');
       const pauses = M.pauses(words);
-      const rate = M.rate(words, duration, lang.unit);
       const deadAir = M.deadAir(pauses, duration);
+      const pace = M.pace(words, duration, deadAir.seconds, lang.unit);
       const stalls = M.stalls(words, pauses);
 
       setStep('analyse');
-      const analysis = await G.analyze({
+      const ask = () => G.analyze({
         apiKey,
         model,
         system: systemPrompt(),
@@ -80,7 +85,7 @@ export default function Home() {
           words,
           language: lang.name,
           stats: {
-            duration, rate, unitLabel: lang.unitLabel, band: lang.band,
+            duration, rate: pace.overall, unitLabel: lang.unitLabel, band: lang.band,
             pauseCount: pauses.length, deadAirSeconds: deadAir.seconds,
             deadAirPercent: deadAir.percent,
             stallPhrases: stalls.slice(0, 3).map((s) => s.phrase),
@@ -88,19 +93,55 @@ export default function Home() {
         }),
       });
 
+      // The analysis is not deterministic, so one pass is one opinion. A second
+      // independent pass turns that from a hidden weakness into a visible
+      // confidence signal: findings both passes agree on are marked, findings
+      // only one pass saw are shown but flagged.
+      if (doubleCheck) setMeta((m) => ({ ...m, analyse: 'two passes' }));
+      const [first, second] = doubleCheck
+        ? await Promise.all([ask(), ask().catch(() => null)])
+        : [await ask(), null];
+
+      const analysis = first;
       const max = words.length - 1;
-      const errors: RankedError[] = cleanSpans(analysis.errors, max)
-        .map((e, i) => ({ ...e, rank: e.rank ?? i + 1 }))
-        .sort((a, b) => a.rank - b.rank);
+      const errors = second
+        ? crossCheck(cleanSpans(first.errors, max), cleanSpans(second.errors, max))
+        : singlePass(cleanSpans(first.errors, max));
       const fillers = cleanSpans(analysis.fillers, max);
+      const crossChecked = !!second;
+
+      // Below a real amount of speech, a level estimate is a guess wearing a
+      // badge. Measure it, then decline to print it.
+      const levelReliable = words.length >= MIN_WORDS_FOR_LEVEL;
+      const errorsPer100 = +((errors.length / Math.max(1, words.length)) * 100).toFixed(1);
+
+      const prior = History.priorIn(lang.code, Date.now());
+      History.add({
+        id: `${Date.now()}`,
+        at: Date.now(),
+        filename: file.name,
+        language: lang.code,
+        languageName: lang.name,
+        words: words.length,
+        duration: +duration.toFixed(1),
+        overallRate: pace.overall,
+        articulationRate: pace.articulation,
+        unit: lang.unit,
+        deadAirPercent: deadAir.percent,
+        errorCount: errors.length,
+        confirmedErrors: errors.filter((e) => e.confirmed).length,
+        errorsPer100,
+        level: analysis.level.band,
+        framework: analysis.level.framework,
+        levelReliable,
+      });
 
       setData({
         words,
-        // A line break landing inside an error span would split it across two
-        // paragraphs and orphan half of it, so those break points are dropped.
         lineStarts: M.lineStartsAvoiding(words, errors),
-        errors, fillers, analysis, lang, pauses, stalls, deadAir, rate, duration,
+        errors, fillers, analysis, lang, pauses, stalls, deadAir, pace, duration,
         envelope, audioUrl: A.playableUrl(samples), filename: file.name,
+        levelReliable, errorsPer100, crossChecked, prior, sttModel,
       });
       setPhase('report');
       window.scrollTo({ top: 0 });
@@ -115,7 +156,7 @@ export default function Home() {
         setError(`Something broke: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
-  }, [file, language, model]);
+  }, [file, language, model, sttModel, doubleCheck]);
 
   const reset = useCallback(() => {
     setPhase('setup');
@@ -129,7 +170,7 @@ export default function Home() {
 
   return (
     <>
-      <header className="studio">
+      <header className={`studio${phase === 'setup' ? '' : ' slim'}`}>
         <div className="wrap">
           <div className="topbar">
             <div className="brand">
@@ -179,6 +220,10 @@ export default function Home() {
           onLanguage={setLanguage}
           onStart={run}
           onNeedKey={() => setKeyOpen(true)}
+          sttModel={sttModel}
+          onSttModel={setSttModel}
+          doubleCheck={doubleCheck}
+          onDoubleCheck={setDoubleCheck}
         />
       ) : (
         <Progress

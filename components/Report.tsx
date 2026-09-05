@@ -7,8 +7,11 @@ import { Transcript } from './Transcript';
 import { Pace, Stalls } from './Pace';
 import { Fixes } from './Fixes';
 import { Verdict, Drills } from './Verdict';
+import { History } from './History';
 import type { Analysis, Filler, RankedError } from '@/lib/schema';
-import type { DeadAir, LanguageProfile, Pause, Stall, Word } from '@/lib/types';
+import type { Session } from '@/lib/history';
+import type { DeadAir, LanguageProfile, Pace as PaceT, Pause, Stall, Word } from '@/lib/types';
+import { MIN_WORDS_FOR_LEVEL } from '@/lib/types';
 
 export interface ReportData {
   words: Word[];
@@ -20,11 +23,16 @@ export interface ReportData {
   pauses: Pause[];
   stalls: Stall[];
   deadAir: DeadAir;
-  rate: number;
+  pace: PaceT;
   duration: number;
   envelope: number[];
   audioUrl: string;
   filename: string;
+  levelReliable: boolean;
+  errorsPer100: number;
+  crossChecked: boolean;
+  prior: Session[];
+  sttModel: string;
 }
 
 export function Report({ data, onAgain }: { data: ReportData; onAgain: () => void }) {
@@ -45,6 +53,16 @@ export function Report({ data, onAgain }: { data: ReportData; onAgain: () => voi
   const { lang, analysis, errors } = data;
   const unitShort = lang.unit === 'chars' ? 'cpm' : 'wpm';
   const level = analysis.level;
+  const confirmed = errors.filter((e) => e.confirmed).length;
+  const sessions = [...data.prior, {
+    id: 'current', at: Date.now(), filename: data.filename,
+    language: lang.code, languageName: lang.name, words: data.words.length,
+    duration: data.duration, overallRate: data.pace.overall,
+    articulationRate: data.pace.articulation, unit: lang.unit,
+    deadAirPercent: data.deadAir.percent, errorCount: errors.length,
+    confirmedErrors: confirmed, errorsPer100: data.errorsPer100,
+    level: level.band, framework: level.framework, levelReliable: data.levelReliable,
+  } as Session];
 
   return (
     <Playback
@@ -74,14 +92,23 @@ export function Report({ data, onAgain }: { data: ReportData; onAgain: () => voi
 
       <div className="score">
         <div className="wrap">
-          <Cell k="Speaking rate" v={<>{data.rate}<small> {unitShort}</small></>}
-            n={lang.band ? `Unhurried native speech runs ${lang.band[0]}–${lang.band[1]}` : 'No native baseline for this language'} />
+          <Cell k="Articulation rate" v={<>{data.pace.articulation}<small> {unitShort}</small></>}
+            n={`While actually speaking · ${data.pace.overall} ${unitShort} counting silence`} />
           <Cell k="Dead air" v={<>{data.deadAir.percent}<small>%</small></>}
             n={`${data.pauses.length} pause${data.pauses.length === 1 ? '' : 's'} over 0.6 seconds`} />
           <Cell k="Mistakes marked" v={<>{errors.length}</>}
-            n={errors.length ? 'Ranked by cost to comprehension' : 'Nothing worth correcting'} />
-          <Cell k="Level" v={level.reaching ? <>{level.band}<small> → {level.reaching}</small></> : <>{level.band}</>}
-            n={`${level.framework} · ${data.words.length} words spoken`} />
+            n={errors.length
+              ? data.crossChecked
+                ? `${confirmed} of ${errors.length} confirmed by a second pass`
+                : 'Single pass — none cross-checked'
+              : 'Nothing worth correcting'} />
+          {data.levelReliable ? (
+            <Cell k="Level" v={level.reaching ? <>{level.band}<small> → {level.reaching}</small></> : <>{level.band}</>}
+              n={`${level.framework} estimate · ${data.words.length} words spoken`} />
+          ) : (
+            <Cell k="Level" v={<span className="nolevel">not placed</span>}
+              n={`Needs ${MIN_WORDS_FOR_LEVEL}+ words · this had ${data.words.length}`} />
+          )}
         </div>
       </div>
 
@@ -115,7 +142,7 @@ export function Report({ data, onAgain }: { data: ReportData; onAgain: () => voi
         <section className="wrap">
           <div className="sechead"><span className="secnum">02</span><h2>Where the time went</h2></div>
           {analysis.pace_note ? <p className="lede">{analysis.pace_note}</p> : null}
-          <Pace rate={data.rate} lang={lang} />
+          <Pace pace={data.pace} lang={lang} unitShort={unitShort} />
           <Stalls stalls={data.stalls} />
           {analysis.stall_note ? <p className="lede" style={{ margin: '24px 0 0' }}>{analysis.stall_note}</p> : null}
         </section>
@@ -130,8 +157,23 @@ export function Report({ data, onAgain }: { data: ReportData; onAgain: () => voi
 
         <section className="wrap">
           <div className="sechead"><span className="secnum">04</span><h2>The verdict, and what to drill</h2></div>
-          <Verdict level={level} paragraphs={analysis.verdict} />
+          <Verdict
+            level={level}
+            paragraphs={analysis.verdict}
+            reliable={data.levelReliable}
+            wordCount={data.words.length}
+          />
           <Drills drills={analysis.drills} />
+        </section>
+
+        <section className="wrap">
+          <div className="sechead"><span className="secnum">05</span><h2>Progress over time</h2></div>
+          <p className="lede">
+            Everything above judges one recording. This compares you against yourself, which
+            is the only comparison here that needs no rubric and no model — the same
+            arithmetic, on the same person, over time.
+          </p>
+          <History sessions={sessions} unitLabel={lang.unitLabel} />
         </section>
 
         <section className="wrap">

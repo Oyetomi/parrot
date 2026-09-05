@@ -2,11 +2,11 @@
 
 import { useRef, useState } from 'react';
 import { options } from '@/lib/languages';
-import { ANALYSIS_MODELS } from '@/lib/groq';
+import { ANALYSIS_MODELS, STT_MODELS } from '@/lib/groq';
 
 export function Setup({
-  file, hasKey, model, language,
-  onFile, onModel, onLanguage, onStart, onNeedKey,
+  file, hasKey, model, language, sttModel, doubleCheck,
+  onFile, onModel, onLanguage, onStart, onNeedKey, onSttModel, onDoubleCheck,
 }: {
   file: File | null;
   hasKey: boolean;
@@ -17,6 +17,10 @@ export function Setup({
   onLanguage: (l: string) => void;
   onStart: () => void;
   onNeedKey: () => void;
+  sttModel: string;
+  onSttModel: (m: string) => void;
+  doubleCheck: boolean;
+  onDoubleCheck: (v: boolean) => void;
 }) {
   const input = useRef<HTMLInputElement | null>(null);
   const [over, setOver] = useState(false);
@@ -92,6 +96,33 @@ export function Setup({
             </select>
             <p className="fieldnote">
               All on Groq&apos;s free tier. Bigger models write better grammar notes.
+            </p>
+          </div>
+          <div className="field">
+            <label htmlFor="stt">Transcription</label>
+            <select id="stt" value={sttModel} onChange={(e) => onSttModel(e.target.value)}>
+              {STT_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+            <p className="fieldnote">
+              Turbo is about twice as fast but mishears more and often drops punctuation.
+            </p>
+          </div>
+          <div className="field">
+            <label htmlFor="dbl">Reliability</label>
+            <label className="check" htmlFor="dbl">
+              <input
+                id="dbl"
+                type="checkbox"
+                checked={doubleCheck}
+                onChange={(e) => onDoubleCheck(e.target.checked)}
+              />
+              <span>Cross-check with a second pass</span>
+            </label>
+            <p className="fieldnote">
+              Runs the analysis twice and marks which mistakes both passes agree on. Two
+              calls instead of one.
             </p>
           </div>
         </div>

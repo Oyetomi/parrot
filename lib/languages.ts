@@ -10,7 +10,9 @@
 // number invented for it.
 //
 // These bands are rough ranges for unhurried conversational speech, good
-// enough to tell "halting" from "fluent". They are not measured constants.
+// enough to tell "halting" from "fluent". They are NOT measured constants and
+// the interface must not present them as though they were — `profile()` carries
+// `estimated: true` so the UI can say so out loud.
 
 import type { CountUnit, LanguageProfile } from './types';
 
@@ -55,7 +57,7 @@ export const LANGUAGES: Record<string, Entry> = {
 export function profile(code: string | undefined): LanguageProfile {
   const key = (code ?? '').slice(0, 2).toLowerCase();
   const hit = LANGUAGES[key];
-  if (hit) return { code: key, rtl: false, benchmarked: true, ...hit };
+  if (hit) return { code: key, rtl: false, benchmarked: true, estimated: true, ...hit };
   return {
     code: key || 'und',
     name: displayName(key) ?? 'this language',
@@ -65,6 +67,7 @@ export function profile(code: string | undefined): LanguageProfile {
     framework: 'CEFR',
     rtl: false,
     benchmarked: false,
+    estimated: true,
   };
 }
 

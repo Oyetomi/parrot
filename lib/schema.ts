@@ -81,3 +81,45 @@ export function cleanSpans<T extends { start: number; end: number }>(
       return true;
     });
 }
+
+/**
+ * The same contract as AnalysisSchema, expressed as JSON Schema for Groq's
+ * structured outputs.
+ *
+ * `json_object` mode only promises syntactically valid JSON — nothing about
+ * its shape — and a reasoning model can fail even that. Strict `json_schema`
+ * uses constrained decoding, so the model physically cannot emit a token that
+ * breaks the schema.
+ *
+ * Strict mode has three hard rules: every property must appear in `required`,
+ * every object must set `additionalProperties: false`, and genuinely optional
+ * fields must be union types with null. Zod still parses the result — this
+ * governs generation, that governs trust.
+ */
+const str = { type: 'string' } as const;
+const int = { type: 'integer' } as const;
+
+const obj = <T extends Record<string, unknown>>(properties: T) => ({
+  type: 'object' as const,
+  additionalProperties: false as const,
+  required: Object.keys(properties),
+  properties,
+});
+
+export const ANALYSIS_JSON_SCHEMA = obj({
+  language_name: str,
+  summary_line: str,
+  level: obj({ framework: str, band: str, reaching: str }),
+  verdict: { type: 'array', items: str },
+  errors: {
+    type: 'array',
+    items: obj({
+      rank: int, start: int, end: int,
+      said: str, correction: str, category: str, note: str, gloss: str,
+    }),
+  },
+  fillers: { type: 'array', items: obj({ start: int, end: int, note: str }) },
+  drills: { type: 'array', items: obj({ title: str, detail: str, examples: str }) },
+  pace_note: str,
+  stall_note: str,
+});

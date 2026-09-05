@@ -8,6 +8,7 @@ import { Pace, Stalls } from './Pace';
 import { Fixes } from './Fixes';
 import { Verdict, Drills } from './Verdict';
 import { History } from './History';
+import * as Dismissed from '@/lib/dismissed';
 import type { Analysis, Filler, RankedError } from '@/lib/schema';
 import type { Session } from '@/lib/history';
 import type { DeadAir, LanguageProfile, Pace as PaceT, Pause, Stall, Word } from '@/lib/types';
@@ -44,6 +45,11 @@ export function Report({ data, onAgain }: { data: ReportData; onAgain: () => voi
   const [follow, setFollow] = useState(true);
   const [openAll, setOpenAll] = useState(0);
   const [miniVisible, setMiniVisible] = useState(false);
+  // A dismissal is the speaker overruling the model about their own speech,
+  // which they are entitled to do. Keyed by the claim, so it holds across
+  // recordings: a model that keeps insisting a natural phrase is wrong is told
+  // once, not once per video.
+  const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
   const playerBox = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -54,7 +60,33 @@ export function Report({ data, onAgain }: { data: ReportData; onAgain: () => voi
     return () => io.disconnect();
   }, []);
 
-  const { lang, analysis, errors } = data;
+  const { lang, analysis } = data;
+
+  useEffect(() => {
+    const stored = Dismissed.all().filter((d) => d.language === lang.code);
+    setDismissedKeys(new Set(stored.map((d) => `${d.said}::${d.correction}`)));
+  }, [lang.code]);
+
+  const dismiss = (e: RankedError) => {
+    Dismissed.add({
+      language: lang.code, said: e.said, correction: e.correction,
+      category: e.category, at: Date.now(),
+    });
+    setDismissedKeys((prev) => new Set(prev).add(`${e.said}::${e.correction}`));
+  };
+  const restore = (e: RankedError) => {
+    Dismissed.remove(lang.code, e.said, e.correction);
+    setDismissedKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(`${e.said}::${e.correction}`);
+      return next;
+    });
+  };
+
+  // Dismissed findings leave the transcript as well. Leaving a phrase
+  // underlined in red after the speaker has said it is fine would be arguing
+  // with the one person here who knows what they meant.
+  const errors = data.errors.filter((e) => !dismissedKeys.has(`${e.said}::${e.correction}`));
   const unitShort = lang.unit === 'chars' ? 'cpm' : 'wpm';
   const level = analysis.level;
   const confirmed = errors.filter((e) => e.confirmed).length;
@@ -179,7 +211,14 @@ export function Report({ data, onAgain }: { data: ReportData; onAgain: () => voi
               ) : null}
             </p>
           ) : null}
-          <Fixes errors={errors} words={data.words} />
+          <Fixes
+            errors={data.errors}
+            words={data.words}
+            language={lang.code}
+            dismissedKeys={dismissedKeys}
+            onDismiss={dismiss}
+            onRestore={restore}
+          />
         </section>
 
         <section className="wrap">

@@ -126,13 +126,19 @@ function ErrorSpan({
         err.correction
       ) : (
         <>
-          {words.slice(err.start, err.end + 1).map((w, k) => (
-            <Fragment key={k}>
+          {words.slice(err.start, err.end + 1).map((w, k) => {
+            const isLast = k === err.end - err.start;
+            const word = (
               <span className="w" ref={(el) => registerWord(err.start + k, el)}>{w.word}</span>
-              {k < err.end - err.start ? ' ' : ''}
-            </Fragment>
-          ))}
-          <sup>{err.rank}</sup>
+            );
+            // The marker has to stay glued to the final word, or a line break
+            // strands it alone on the next line in its own coloured box.
+            return isLast ? (
+              <span className="nobreak" key={k}>{word}<sup>{err.rank}</sup></span>
+            ) : (
+              <Fragment key={k}>{word}{' '}</Fragment>
+            );
+          })}
         </>
       )}
     </span>

@@ -76,6 +76,16 @@ Do NOT mark any of these. None of them is an error:
 - Ordinary spoken register. Speech is not writing. Dropped negative particles,
   contractions, informal pronouns, ellipsis and loose word order are all normal
   in conversation and correct as spoken.
+- Fixed colloquial expressions, especially ones that leave a word implied. These
+  are complete as they stand and "restoring" the implied word is not a
+  correction. Italian \`è da un sacco che...\` does not need \`di tempo\`. French
+  \`ça fait un bail\` needs nothing after it. English "it's been ages" is not
+  short for anything. If a phrase is one a native speaker says daily, it is
+  right, even when a longer form also exists.
+- Anything where your proposed correction merely makes the phrasing longer,
+  more explicit or more formal without fixing an actual error. Ask yourself:
+  would a native speaker in a cafe say the original without anyone noticing? If
+  yes, say nothing.
 - Disfluency: false starts, repetitions, self-corrections, filler, trailing off.
   These are how spontaneous speech works in every language, including among
   native speakers. Mark them under "fillers" if anything, never as errors.

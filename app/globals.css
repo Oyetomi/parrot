@@ -227,6 +227,10 @@ h2{font-size:clamp(24px,4.2vw,32px);line-height:1.08}
 .err:hover,.err.open{background:var(--corail-soft)}
 .err sup{font-family:'IBM Plex Mono',monospace;font-size:9.5px;font-weight:600;text-decoration:none;
   display:inline-block;vertical-align:super;margin-left:2px}
+.nobreak{white-space:nowrap}
+/* a span crossing a line break should carry its full styling onto both lines,
+   not render as two half-open boxes */
+.err{-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .crutch{background:var(--or-soft);border-radius:3px;padding:1px 4px;color:var(--or)}
 /* Corrected view. A wavy underline is the universal "something is wrong here"
    mark, so it is dropped entirely rather than recoloured — green wavy would
@@ -295,6 +299,16 @@ h2{font-size:clamp(24px,4.2vw,32px);line-height:1.08}
 @media(max-width:600px){.stalls li{grid-template-columns:66px 52px;row-gap:3px}.stalls .jump{grid-column:1/-1}}
 
 /* ===== fixes ===== */
+.fixactions{grid-column:2;display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.fixactions .hearit{margin-top:0}
+.hearit.reject:hover{border-color:var(--menthe);color:var(--menthe)}
+.dismissnote{margin:0 0 18px;font-size:13.5px;color:var(--muted)}
+.dismissnote b{color:var(--ink);font-weight:600}
+.linkish{color:var(--bleu);text-decoration:underline;text-underline-offset:3px;font:inherit;padding:0}
+.fixes.dismissed{margin-bottom:22px;opacity:.72}
+.fixes.dismissed .said-b{text-decoration:none;background:var(--paper);color:var(--muted)}
+.fixes.dismissed .want-b{background:var(--paper);color:var(--muted);font-weight:400}
+@media(max-width:600px){ .fixactions{grid-column:1/-1} }
 .filternote{
   margin:0 0 22px;padding:13px 16px;font-size:13.5px;line-height:1.6;
   color:var(--ink2);background:var(--card);border:1px solid var(--line);

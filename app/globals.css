@@ -299,6 +299,13 @@ h2{font-size:clamp(24px,4.2vw,32px);line-height:1.08}
 @media(max-width:600px){.stalls li{grid-template-columns:66px 52px;row-gap:3px}.stalls .jump{grid-column:1/-1}}
 
 /* ===== fixes ===== */
+.trainwarn{
+  margin:0 0 16px;padding:12px 14px;font-size:13.5px;line-height:1.6;
+  background:var(--or-soft);border:1px solid var(--or);border-radius:var(--radius);
+  color:var(--ink2);
+}
+.trainwarn b{color:var(--or)}
+.keycall-actions .ghost.dark{padding:10px 18px;font-size:12px}
 .fixactions{grid-column:2;display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .fixactions .hearit{margin-top:0}
 .hearit.reject:hover{border-color:var(--menthe);color:var(--menthe)}

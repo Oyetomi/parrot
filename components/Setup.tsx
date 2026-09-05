@@ -1,22 +1,26 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { options } from '@/lib/languages';
-import { ANALYSIS_MODELS, STT_MODELS } from '@/lib/groq';
+import { STT_MODELS } from '@/lib/groq';
+import { PROVIDERS, providerById, safeListModels, type ModelChoice } from '@/lib/providers';
 
 export function Setup({
-  file, hasKey, model, language, sttModel, doubleCheck,
-  onFile, onModel, onLanguage, onStart, onNeedKey, onSttModel, onDoubleCheck,
+  file, groqKey, analysisKey, providerId, model, language, sttModel, doubleCheck,
+  onFile, onProvider, onModel, onLanguage, onStart, onNeedKey, onSttModel, onDoubleCheck,
 }: {
   file: File | null;
-  hasKey: boolean;
+  groqKey: string;
+  analysisKey: string;
+  providerId: string;
+  onProvider: (id: string) => void;
   model: string;
   language: string;
   onFile: (f: File) => void;
   onModel: (m: string) => void;
   onLanguage: (l: string) => void;
   onStart: () => void;
-  onNeedKey: () => void;
+  onNeedKey: (which: string) => void;
   sttModel: string;
   onSttModel: (m: string) => void;
   doubleCheck: boolean;
@@ -24,13 +28,31 @@ export function Setup({
 }) {
   const input = useRef<HTMLInputElement | null>(null);
   const [over, setOver] = useState(false);
+  const [models, setModels] = useState<ModelChoice[]>([]);
+  const provider = providerById(providerId);
+  const hasKey = !!groqKey && !!analysisKey;
+
+  // Model names churn, and some that a provider lists cannot actually be
+  // called. Asking the provider with the user's own key is the only listing
+  // that reflects what this key can really use.
+  useEffect(() => {
+    let live = true;
+    safeListModels(provider, analysisKey).then((found) => {
+      if (!live) return;
+      setModels(found);
+      if (!model || !found.some((f) => f.id === model)) onModel(found[0]?.id ?? '');
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providerId, analysisKey]);
 
   const take = (f: File | undefined | null) => {
     if (!f) return;
     onFile(f);
     // Nothing can happen without a key, so ask for it now rather than
     // leaving the button greyed out with no explanation.
-    if (!hasKey) onNeedKey();
+    if (!groqKey) onNeedKey('groq');
+    else if (!analysisKey) onNeedKey(providerId);
   };
 
   return (
@@ -39,42 +61,49 @@ export function Setup({
         {!hasKey ? (
           <div className="keycall">
             <div className="keycall-head">
-              <span className="keycall-badge">Step 1</span>
-              <h2>Get a free Groq API key</h2>
+              <span className="keycall-badge">Setup</span>
+              <h2>Two free keys, both no card</h2>
             </div>
             <p>
-              Parrot has no server of its own, so it uses yours. The key stays in this
-              browser and talks straight to Groq — nothing is uploaded to us, because
-              there is no us to upload it to.
+              Parrot has no server of its own, so it uses yours. Keys stay in this browser
+              and talk straight to the provider — nothing is uploaded to us, because there
+              is no us to upload it to.
             </p>
             <ol className="keysteps">
               <li>
-                Open{' '}
+                <b>Groq</b> transcribes the audio — it is the only one that returns
+                word-by-word timings, which the read-along needs.{' '}
                 <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">
                   console.groq.com/keys
-                </a>{' '}
-                and sign in with Google or GitHub. No card needed.
+                </a>
               </li>
-              <li>Press <b>Create API Key</b>, give it any name.</li>
-              <li>Copy it straight away — Groq shows it once, then never again.</li>
-              <li>Paste it below.</li>
+              <li>
+                <b>{provider.name}</b> judges the language. You can switch this below and
+                compare — they disagree, and your recordings decide which is right.{' '}
+                <a href={provider.keyUrl} target="_blank" rel="noopener noreferrer">
+                  {provider.keyUrl.replace(/^https:\/\//, '')}
+                </a>
+              </li>
+              <li>Copy each key straight away — most show it once, then never again.</li>
             </ol>
             <div className="keycall-actions">
-              <button className="cta small" type="button" onClick={onNeedKey}>
-                Paste my key
-              </button>
-              <a
-                className="ghost dark"
-                href="https://console.groq.com/keys"
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                className={groqKey ? 'ghost dark' : 'cta small'}
+                type="button"
+                onClick={() => onNeedKey('groq')}
               >
-                Open Groq console ↗
-              </a>
+                {groqKey ? 'Groq key \u2713' : 'Add Groq key'}
+              </button>
+              <button
+                className={analysisKey ? 'ghost dark' : 'cta small'}
+                type="button"
+                onClick={() => onNeedKey(providerId)}
+              >
+                {analysisKey ? `${provider.name} key \u2713` : `Add ${provider.name} key`}
+              </button>
             </div>
             <p className="keyfree">
-              The free tier covers roughly <b>8 hours of audio a day</b> — far more than
-              this needs.
+              Both free tiers are generous enough that this will not come close to them.
             </p>
           </div>
         ) : null}
@@ -131,14 +160,36 @@ export function Setup({
             </p>
           </div>
           <div className="field">
+            <label htmlFor="provider">Who judges the language</label>
+            <select id="provider" value={providerId} onChange={(e) => onProvider(e.target.value)}>
+              {PROVIDERS.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <p className="fieldnote">
+              {provider.freeTierNote}{' '}
+              <button type="button" className="linkish" onClick={() => onNeedKey(providerId)}>
+                {analysisKey ? 'Change key' : 'Add key'}
+              </button>
+            </p>
+          </div>
+
+          <div className="field">
             <label htmlFor="model">Analysis model</label>
-            <select id="model" value={model} onChange={(e) => onModel(e.target.value)}>
-              {ANALYSIS_MODELS.map((m) => (
+            <select
+              id="model"
+              value={model}
+              onChange={(e) => onModel(e.target.value)}
+              disabled={!models.length}
+            >
+              {models.map((m) => (
                 <option key={m.id} value={m.id}>{m.label}</option>
               ))}
             </select>
             <p className="fieldnote">
-              All on Groq&apos;s free tier. Bigger models write better grammar notes.
+              {analysisKey
+                ? `${models.length} models available on your key. Names ending "-latest" keep working as the provider updates.`
+                : 'Add a key and this fills in with the models your key can actually use.'}
             </p>
           </div>
           <div className="field">
@@ -175,7 +226,11 @@ export function Setup({
             {file ? 'Analyse this recording' : 'Choose a file to begin'}
           </button>
           <span className="startnote">
-            {file && !hasKey ? 'Add your Groq API key first →' : ''}
+            {file && !groqKey
+              ? 'Add your Groq key — it does the transcription'
+              : file && !analysisKey
+                ? `Add your ${provider.name} key — it does the analysis`
+                : ''}
           </span>
         </div>
       </section>

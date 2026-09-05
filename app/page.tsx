@@ -7,6 +7,8 @@ import { Report, type ReportData } from '@/components/Report';
 import { KeyDialog } from '@/components/KeyDialog';
 import * as A from '@/lib/audio';
 import * as G from '@/lib/groq';
+import { PROVIDERS, providerById } from '@/lib/providers';
+import { ApiError } from '@/lib/api-error';
 import * as M from '@/lib/metrics';
 import * as Store from '@/lib/store';
 import { profile } from '@/lib/languages';
@@ -17,17 +19,20 @@ import { verify } from '@/lib/verify';
 import * as History from '@/lib/history';
 import { MIN_WORDS_FOR_LEVEL, type Phase, type StepId } from '@/lib/types';
 
-const DEFAULT_MODEL = G.ANALYSIS_MODELS[0].id;
+const DEFAULT_PROVIDER = PROVIDERS[0].id;
 
 export default function Home() {
   const [phase, setPhase] = useState<Phase>('setup');
   const [file, setFile] = useState<File | null>(null);
-  const [model, setModel] = useState<string>(DEFAULT_MODEL);
+  const [providerId, setProviderId] = useState<string>(DEFAULT_PROVIDER);
+  const [model, setModel] = useState<string>('');
   const [language, setLanguage] = useState('');
   const [sttModel, setSttModel] = useState<string>(G.STT_MODEL);
   const [doubleCheck, setDoubleCheck] = useState(true);
-  const [hasKey, setHasKey] = useState(false);
-  const [keyOpen, setKeyOpen] = useState(false);
+  // Transcription always needs Groq; analysis needs whichever provider is picked.
+  const [groqKey, setGroqKey] = useState('');
+  const [analysisKey, setAnalysisKey] = useState('');
+  const [keyOpen, setKeyOpen] = useState<string | null>(null);
   const [step, setStep] = useState<StepId>('extract');
   const [meta, setMeta] = useState<Partial<Record<StepId, string>>>({});
   const [error, setError] = useState<string | null>(null);
@@ -35,16 +40,39 @@ export default function Home() {
 
   // localStorage is only readable on the client, so seed after mount.
   useEffect(() => {
-    setHasKey(!!Store.getKey());
-    setModel(Store.getModel(DEFAULT_MODEL));
+    const p = Store.getProvider(DEFAULT_PROVIDER);
+    setProviderId(p);
+    setModel(Store.getModel(p, ''));
+    setGroqKey(Store.getKey('groq'));
+    setAnalysisKey(Store.getKey(p));
   }, []);
 
-  const chooseModel = useCallback((m: string) => { setModel(m); Store.setModel(m); }, []);
+  const provider = providerById(providerId);
+  const hasKeys = !!groqKey && !!analysisKey;
+
+  const chooseProvider = useCallback((id: string) => {
+    setProviderId(id);
+    Store.setProvider(id);
+    setModel(Store.getModel(id, ''));
+    setAnalysisKey(Store.getKey(id));
+  }, []);
+
+  const chooseModel = useCallback((m: string) => {
+    setModel(m);
+    Store.setModel(providerId, m);
+  }, [providerId]);
+
+  const refreshKeys = useCallback(() => {
+    setGroqKey(Store.getKey('groq'));
+    setAnalysisKey(Store.getKey(providerId));
+  }, [providerId]);
 
   const run = useCallback(async () => {
     if (!file) return;
-    const apiKey = Store.getKey();
-    if (!apiKey) { setKeyOpen(true); return; }
+    const apiKey = Store.getKey('groq');
+    const analysisApiKey = Store.getKey(providerId);
+    if (!apiKey) { setKeyOpen('groq'); return; }
+    if (!analysisApiKey) { setKeyOpen(providerId); return; }
 
     setPhase('working');
     setError(null);
@@ -78,9 +106,9 @@ export default function Home() {
       const stalls = M.stalls(words, pauses);
 
       setStep('analyse');
-      const ask = () => G.analyze({
-        apiKey,
-        model,
+      const ask = () => provider.analyze({
+        apiKey: analysisApiKey,
+        model: model || provider.fallbackModels[0].id,
         system: systemPrompt(),
         user: userPrompt({
           words,
@@ -159,13 +187,13 @@ export default function Home() {
         setError(
           `${e.message}\n\nConvert it first, then try the result:\n\nffmpeg -i "${file.name}" -vn -ac 1 -ar 16000 audio.wav`,
         );
-      } else if (e instanceof G.ApiError) {
+      } else if (e instanceof ApiError) {
         setError(e.message);
       } else {
         setError(`Something broke: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
-  }, [file, language, model, sttModel, doubleCheck]);
+  }, [file, language, model, sttModel, doubleCheck, providerId, provider]);
 
   const reset = useCallback(() => {
     setPhase('setup');
@@ -188,11 +216,11 @@ export default function Home() {
             </div>
             <div className="topactions">
               <button
-                className={`ghost${hasKey ? '' : ' on'}`}
+                className={`ghost${hasKeys ? '' : ' on'}`}
                 type="button"
-                onClick={() => setKeyOpen(true)}
+                onClick={() => setKeyOpen('groq')}
               >
-                {hasKey ? 'API key ✓' : 'API key'}
+                {hasKeys ? 'API keys ✓' : 'API keys'}
               </button>
               <a
                 className="ghost"
@@ -221,14 +249,17 @@ export default function Home() {
       {phase === 'setup' ? (
         <Setup
           file={file}
-          hasKey={hasKey}
+          groqKey={groqKey}
+          analysisKey={analysisKey}
+          providerId={providerId}
           model={model}
           language={language}
           onFile={setFile}
+          onProvider={chooseProvider}
           onModel={chooseModel}
           onLanguage={setLanguage}
           onStart={run}
-          onNeedKey={() => setKeyOpen(true)}
+          onNeedKey={(which) => setKeyOpen(which)}
           sttModel={sttModel}
           onSttModel={setSttModel}
           doubleCheck={doubleCheck}
@@ -245,8 +276,8 @@ export default function Home() {
       )}
 
       <KeyDialog
-        open={keyOpen}
-        onClose={() => { setKeyOpen(false); setHasKey(!!Store.getKey()); }}
+        which={keyOpen}
+        onClose={() => { setKeyOpen(null); refreshKeys(); }}
       />
     </>
   );

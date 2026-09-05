@@ -1,19 +1,28 @@
-// The API key lives in this browser only. No server holds it, because there
-// is no server. Every read is guarded: private windows and blocked site data
-// make localStorage throw rather than return null.
+// Keys live in this browser only. No server holds them, because there is no
+// server. Every read is guarded: private windows and blocked site data make
+// localStorage throw rather than return null.
+//
+// Keys are stored per provider, so switching between them to compare results
+// does not mean pasting a key back in each time.
 
-const KEY = 'parrot.groq.key';
-const MODEL = 'parrot.model';
+const KEY_PREFIX = 'parrot.key.';
+const PROVIDER = 'parrot.provider';
+const MODEL_PREFIX = 'parrot.model.';
 
-export function getKey(): string {
-  try { return localStorage.getItem(KEY) ?? ''; } catch { return ''; }
+function read(k: string): string {
+  try { return localStorage.getItem(k) ?? ''; } catch { return ''; }
 }
-export function setKey(v: string): void {
-  try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch { /* ignore */ }
+function write(k: string, v: string): void {
+  try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch { /* ignore */ }
 }
-export function getModel(fallback: string): string {
-  try { return localStorage.getItem(MODEL) ?? fallback; } catch { return fallback; }
+
+export function getKey(provider: string): string { return read(KEY_PREFIX + provider); }
+export function setKey(provider: string, v: string): void { write(KEY_PREFIX + provider, v); }
+
+export function getProvider(fallback: string): string { return read(PROVIDER) || fallback; }
+export function setProvider(v: string): void { write(PROVIDER, v); }
+
+export function getModel(provider: string, fallback: string): string {
+  return read(MODEL_PREFIX + provider) || fallback;
 }
-export function setModel(v: string): void {
-  try { localStorage.setItem(MODEL, v); } catch { /* ignore */ }
-}
+export function setModel(provider: string, v: string): void { write(MODEL_PREFIX + provider, v); }
